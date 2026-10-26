@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Modo performance
+Comment=Perfil de energia, modo gráfico e estado da NVIDIA, do MeowSystem
+Exec=@bindir@/meowsystem-performance
+Terminal=false
+Type=Application
+StartupNotify=true
+Icon=power-profile-performance-symbolic
+Categories=COSMIC;Utility;
+Keywords=COSMIC;Applet;Energia;Desempenho;GPU;NVIDIA;
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicShrinkable=true
