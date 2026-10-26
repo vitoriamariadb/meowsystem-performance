@@ -1,0 +1,31 @@
+# meowsystem-performance — o modo performance na topbar do COSMIC.
+#
+# A mesma base do meowsystem-leitura: o `rev` do libcosmic é pinado aqui e o
+# `Cargo.lock` vai no repositório. O `zbus` e o `tokio` já estão na árvore do
+# libcosmic; declará-los só os torna alcançáveis daqui.
+[package]
+name = "meowsystem-performance"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+rust-version = "1.93"
+publish = false
+repository = "https://github.com/vitoriamariadb/meowsystem-performance"
+
+[[bin]]
+name = "meowsystem-performance"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.53", default-features = false, features = ["rt", "sync"] }
+zbus = { version = "5.19", default-features = false, features = ["tokio"] }
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic.git"
+rev = "1f6dc991eaa5115a09be2505cc8a323e5b2b0bff"
+default-features = false
+features = ["a11y", "applet", "wayland"]
+
+# Um binário de applet que só desenha não precisa de símbolo nenhum.
+[profile.release]
+strip = true
