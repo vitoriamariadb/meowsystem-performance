@@ -168,6 +168,17 @@ pub fn ler_nvidia_smi(saida: &str) -> Option<LeituraGpu> {
     })
 }
 
+pub fn nome_curto_da_gpu(nome: &str) -> String {
+    let mut n = nome.trim();
+    for sufixo in [" GPU", " Laptop", " Mobile", " Max-Q"] {
+        n = n.strip_suffix(sufixo).unwrap_or(n).trim_end();
+    }
+    for prefixo in ["NVIDIA ", "GeForce "] {
+        n = n.strip_prefix(prefixo).unwrap_or(n).trim_start();
+    }
+    if n.is_empty() { "NVIDIA".into() } else { n.into() }
+}
+
 /// A linha curta da GPU: "47 °C · 1,7 W · 0% · P8". Vírgula decimal, como no
 /// resto da interface em português.
 pub fn resumo_da_gpu(l: &LeituraGpu) -> String {
@@ -246,6 +257,15 @@ mod testes {
         assert_eq!(l.persistencia, Some(true));
         assert_eq!(l.pstate.as_deref(), Some("P8"));
         assert_eq!(resumo_da_gpu(&l), "47 °C · 1,7 W · 0% · P8");
+    }
+
+    #[test]
+    fn nome_da_gpu_cabe_numa_linha() {
+        assert_eq!(nome_curto_da_gpu("NVIDIA GeForce RTX 4060 Laptop GPU"), "RTX 4060");
+        assert_eq!(nome_curto_da_gpu("NVIDIA GeForce GTX 1650 with Max-Q Design"), "GTX 1650 with Max-Q Design");
+        assert_eq!(nome_curto_da_gpu("NVIDIA RTX A2000 Laptop GPU"), "RTX A2000");
+        assert_eq!(nome_curto_da_gpu("Quadro P1000"), "Quadro P1000");
+        assert_eq!(nome_curto_da_gpu("NVIDIA GPU"), "NVIDIA");
     }
 
     #[test]

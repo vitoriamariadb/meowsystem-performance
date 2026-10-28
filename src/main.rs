@@ -1,27 +1,31 @@
 // meowsystem-performance — o modo performance na topbar do COSMIC.
 //
 // Na barra, o ponteiro do perfil de energia do system76-power. No popup, os
-// três perfis, o perfil que a placa-mãe seguiu, o modo gráfico e a NVIDIA.
+// três perfis, o modo gráfico e a NVIDIA, nas cores do pack quando ele as traz.
 // Trocar perfil é na hora; trocar modo gráfico pede confirmação e só vale
 // depois de reiniciar, e o popup diz isso até o reinício acontecer.
 
 mod energia;
 mod modelo;
 mod sistema;
+mod tema;
 
 use std::path::Path;
+use std::rc::Rc;
 use std::time::Duration;
 
 use cosmic::app::Core;
 use cosmic::applet::{menu_button, padded_control};
 use cosmic::cosmic_config::{Config, ConfigGet, ConfigSet};
-use cosmic::iced::{Alignment, Length, Limits, Subscription, window, window::Id};
+use cosmic::iced::core::text::{Ellipsize, EllipsizeHeightLimit, Wrapping};
+use cosmic::iced::{Alignment, Background, Color, Length, Limits, Subscription, window, window::Id};
 use cosmic::surface::action::{app_popup, destroy_popup};
-use cosmic::widget::{Column, Row, button, divider, icon, text};
-use cosmic::{Action, Element, Task};
+use cosmic::widget::{Column, Row, button, divider, icon, svg, text};
+use cosmic::{Action, Element, Task, theme};
 
 use energia::{Leitura, System76};
 use modelo::{EstadoGpu, ModoGrafico, Perfil};
+use tema::Tema;
 
 /// O `app_id`: o basename do `.desktop` que o cosmic-panel procura.
 const ID: &str = "io.github.meowsystem.Performance";
@@ -58,6 +62,42 @@ fn selo(arte: &'static [u8]) -> Element<'static, Message> {
         .into()
 }
 
+fn cor_do_acento(t: &cosmic::Theme) -> Color {
+    t.cosmic().accent.base.into()
+}
+
+fn svg_no_acento() -> theme::Svg {
+    theme::Svg::Custom(Rc::new(|t| svg::Style {
+        color: Some(cor_do_acento(t)),
+    }))
+}
+
+fn texto_no_acento() -> theme::Text {
+    theme::Text::Custom(|t| cosmic::iced::widget::text::Style {
+        color: Some(cor_do_acento(t)),
+        ..Default::default()
+    })
+}
+
+fn estilo_do_marcado(t: &cosmic::Theme) -> button::Style {
+    let c = t.cosmic();
+    let mut s = button::Style::new();
+    s.background = Some(Background::Color(c.accent_button.base.into()));
+    s.text_color = Some(c.accent_button.on.into());
+    s.icon_color = Some(c.accent_button.on.into());
+    s.border_radius = c.corner_radii.radius_xl.into();
+    s
+}
+
+fn botao_marcado() -> theme::Button {
+    theme::Button::Custom {
+        active: Box::new(|_, t| estilo_do_marcado(t)),
+        disabled: Box::new(estilo_do_marcado),
+        hovered: Box::new(|_, t| estilo_do_marcado(t)),
+        pressed: Box::new(|_, t| estilo_do_marcado(t)),
+    }
+}
+
 struct Applet {
     core: Core,
     popup: Option<Id>,
@@ -73,10 +113,10 @@ struct Applet {
     /// O modo que ela clicou e ainda não confirmou.
     confirmar: Option<ModoGrafico>,
     trocando_grafico: Option<ModoGrafico>,
-    placa: Option<String>,
     gpu: Option<EstadoGpu>,
     sondando: bool,
     estado: Option<Config>,
+    tema: Tema,
 }
 
 #[derive(Clone, Debug)]
@@ -160,22 +200,24 @@ impl Applet {
         let mut col = Column::new();
         for p in Perfil::TODOS {
             let marcado = self.perfil == Some(p);
-            let mut linha = Row::new()
-                .push(selo(arte_do_perfil(Some(p))))
-                .push(text::body(p.nome()).width(Length::Fill))
-                .spacing(8)
-                .align_y(Alignment::Center);
+            let arte = icon::icon(icon::from_svg_bytes(arte_do_perfil(Some(p))).symbolic(true)).size(ICONE_ROTULO);
+            let nome = text::body(p.nome()).width(Length::Fill);
+            let mut linha = Row::new().spacing(8).align_y(Alignment::Center);
             if marcado {
-                linha = linha.push(icon::from_name("object-select-symbolic").size(ICONE_ROTULO));
+                linha = linha
+                    .push(arte.class(svg_no_acento()))
+                    .push(nome.class(texto_no_acento()))
+                    .push(
+                        icon::from_name("object-select-symbolic")
+                            .size(ICONE_ROTULO)
+                            .icon()
+                            .class(svg_no_acento()),
+                    );
+            } else {
+                linha = linha.push(arte).push(nome);
             }
             let pode = !self.trocando_perfil && !marcado;
             col = col.push(menu_button(linha).on_press_maybe(pode.then_some(Message::Escolher(p))));
-        }
-        if let Some(placa) = &self.placa {
-            col = col.push(padded_control(text::caption(format!(
-                "Placa: {}",
-                modelo::nome_do_perfil_da_placa(placa)
-            ))));
         }
         col.into()
     }
@@ -186,11 +228,10 @@ impl Applet {
         let mut opcoes = Row::new().spacing(8);
         for m in ModoGrafico::OFERECIDOS {
             let livre = self.trocando_grafico.is_none() && m != atual;
-            let b = if m == atual {
-                button::suggested(m.nome())
-            } else {
-                button::standard(m.nome())
-            };
+            let mut b = button::standard(m.nome());
+            if m == atual {
+                b = b.class(botao_marcado());
+            }
             opcoes = opcoes.push(b.on_press_maybe(livre.then_some(Message::PedirGrafico(m))));
         }
         if atual == ModoGrafico::Computacao {
@@ -225,24 +266,24 @@ impl Applet {
     }
 
     fn bloco_gpu(&self) -> Option<Element<'_, Message>> {
-        let texto = match self.gpu.as_ref()? {
+        let (nome, valor) = match self.gpu.as_ref()? {
             EstadoGpu::Desligada => return None,
-            EstadoGpu::Dormindo => ("NVIDIA".to_string(), Some("Dormindo".to_string()), None),
-            EstadoGpu::SemResposta => ("NVIDIA".to_string(), Some("Sem resposta".to_string()), None),
-            EstadoGpu::Ativa(l) => {
-                let nome = l.nome.trim_start_matches("NVIDIA ").trim_start_matches("GeForce ").to_string();
-                let persist = l.persistencia.map(|p| {
-                    if p { "Persistência ligada" } else { "Persistência desligada" }.to_string()
-                });
-                (nome, Some(modelo::resumo_da_gpu(l)).filter(|s| !s.is_empty()), persist)
-            }
+            EstadoGpu::Dormindo => ("NVIDIA".to_string(), "Dormindo".to_string()),
+            EstadoGpu::SemResposta => ("NVIDIA".to_string(), "Sem resposta".to_string()),
+            EstadoGpu::Ativa(l) => (modelo::nome_curto_da_gpu(&l.nome), modelo::resumo_da_gpu(l)),
         };
-        let (nome, valor, persist) = texto;
-        let mut col = Column::new().push(Self::linha(ARTE_GPU, nome, valor));
-        if let Some(p) = persist {
-            col = col.push(text::caption(p));
-        }
-        Some(padded_control(col.spacing(4)).into())
+        let linha = Row::new()
+            .push(selo(ARTE_GPU))
+            .push(
+                text::body(nome)
+                    .width(Length::Fill)
+                    .wrapping(Wrapping::None)
+                    .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1))),
+            )
+            .push(text::body(valor).wrapping(Wrapping::None))
+            .spacing(8)
+            .align_y(Alignment::Center);
+        Some(padded_control(linha).into())
     }
 }
 
@@ -273,13 +314,14 @@ impl cosmic::Application for Applet {
             modulo_nvidia: sistema::modulo_nvidia_carregado(Path::new(SYS)),
             confirmar: None,
             trocando_grafico: None,
-            placa: sistema::perfil_da_placa(Path::new(SYS)),
             gpu: None,
             sondando: false,
             estado: Config::new_state(ID, NS_ESTADO_V).ok(),
+            tema: Tema::load(ID),
         };
+        let cores = applet.aplicar_tema(cosmic::theme::active().cosmic().is_dark, false);
         let t = applet.ler();
-        (applet, t)
+        (applet, Task::batch([cores, t]))
     }
 
     fn on_close_requested(&self, id: window::Id) -> Option<Message> {
@@ -296,7 +338,6 @@ impl cosmic::Application for Applet {
                 }
             }
             Message::Tique => {
-                self.placa = sistema::perfil_da_placa(Path::new(SYS));
                 self.modulo_nvidia = sistema::modulo_nvidia_carregado(Path::new(SYS));
                 return self.ler();
             }
@@ -332,7 +373,6 @@ impl cosmic::Application for Applet {
                     }
                     Err(e) => self.erro = Some(e),
                 }
-                self.placa = sistema::perfil_da_placa(Path::new(SYS));
             }
             Message::PedirGrafico(m) => self.confirmar = Some(m),
             Message::Cancelar => self.confirmar = None,
@@ -409,9 +449,43 @@ impl cosmic::Application for Applet {
     fn style(&self) -> Option<cosmic::iced::theme::Style> {
         Some(cosmic::applet::style())
     }
+
+    fn system_theme_update(
+        &mut self,
+        _keys: &[&'static str],
+        novo: &cosmic::cosmic_theme::Theme,
+    ) -> Task<Action<Self::Message>> {
+        self.aplicar_tema(novo.is_dark, false)
+    }
+
+    fn system_theme_mode_update(
+        &mut self,
+        _keys: &[&'static str],
+        modo: &cosmic::cosmic_theme::ThemeMode,
+    ) -> Task<Action<Self::Message>> {
+        self.aplicar_tema(modo.is_dark, false)
+    }
 }
 
 impl Applet {
+    fn aplicar_tema(&self, escuro: bool, antes: bool) -> Task<Action<Message>> {
+        match self.tema.cosmic(escuro) {
+            Some(t) => cosmic::command::set_theme(t),
+            None if antes => cosmic::command::set_theme(self.core.system_theme().clone()),
+            None => Task::none(),
+        }
+    }
+
+    fn reler_tema(&mut self) -> Task<Action<Message>> {
+        let novo = Tema::load(ID);
+        if novo == self.tema {
+            return Task::none();
+        }
+        let antes = self.tema.cosmic(true).is_some();
+        self.tema = novo;
+        self.aplicar_tema(cosmic::theme::active().cosmic().is_dark, antes)
+    }
+
     fn abre_fecha(&mut self) -> Task<Action<Message>> {
         if let Some(popup) = self.popup.take() {
             self.confirmar = None;
@@ -427,8 +501,8 @@ impl Applet {
                 let popup = Id::unique();
                 let mut ajustes = estado.core.applet.get_popup_settings(pai, popup, None, None, None);
                 ajustes.positioner.size_limits = Limits::NONE
-                    .max_width(400.0)
-                    .min_width(300.0)
+                    .max_width(420.0)
+                    .min_width(360.0)
                     .min_height(120.0)
                     .max_height(1080.0);
                 estado.popup = Some(popup);
@@ -436,7 +510,8 @@ impl Applet {
             },
             None,
         ));
-        Task::batch([abrir, self.ler(), self.sondar()])
+        let cores = self.reler_tema();
+        Task::batch([cores, abrir, self.ler(), self.sondar()])
     }
 }
 
