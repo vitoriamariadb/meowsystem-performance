@@ -5,7 +5,7 @@
 # libcosmic; declará-los só os torna alcançáveis daqui.
 [package]
 name = "meowsystem-performance"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "GPL-3.0"
 rust-version = "1.93"
@@ -17,6 +17,7 @@ name = "meowsystem-performance"
 path = "src/main.rs"
 
 [dependencies]
+serde_json = "1"
 tokio = { version = "1.53", default-features = false, features = ["rt", "sync"] }
 zbus = { version = "5.19", default-features = false, features = ["tokio"] }
 
