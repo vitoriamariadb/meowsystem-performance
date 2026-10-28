@@ -37,15 +37,14 @@ O `Cargo.lock` é o do meowsystem-leitura mais este pacote: `zbus` e `tokio` já
 | `~/.local/state/cosmic/io.github.meowsystem.Performance/v1/{boot,modo}` | o modo do começo do boot | uma vez por boot |
 
 Nenhuma chave de configuração: o estado é do `system76-power`. O applet não mexe na
-persistência da NVIDIA (é o drop-in `10-nitro-persistence.conf` do zsh); só a mostra.
+persistência da NVIDIA (é o drop-in `10-nitro-persistence.conf` do zsh); só o `--estado` a mostra.
 
 ## Quem continua fazendo o quê
 
 - O `nitro-profiled` continua dono da placa: ele ouve o `PowerProfileSwitch` e põe o
   `platform_profile` no par do perfil (Desempenho → `balanced-performance`, Equilibrado →
   `balanced`, Economia → `low-power`), destrava a frequência que o Economia prende e troca o
-  perfil na tomada. O applet só troca o perfil do `system76-power`; o resto segue sozinho, e a
-  linha «Placa» mostra o resultado.
+  perfil na tomada. O applet só troca o perfil do `system76-power`; o resto segue sozinho.
 - A regra `50-system76-power.rules` (polkit, instalada pelo self-heal) é o que deixa o clique
   trocar sem senha.
 
@@ -70,6 +69,8 @@ persistência da NVIDIA (é o drop-in `10-nitro-persistence.conf` do zsh); só a
 
 ## Tema
 
-O mesmo contrato do meowsystem-leitura: `cosmic::applet::style()`, o `popup_container` do
-libcosmic e desenhos `symbolic` repintados com a cor do tema do COSMIC. O MeowSystem não
-escreve nada para este applet.
+O contrato dos outros applets do MeowSystem: o applet lê
+`~/.config/meowsystem/extensoes/io.github.meowsystem.Performance/tema.conf` ao subir e a cada
+vez que o popup abre. No pino: `TEMA="io.github.meowsystem.Performance"` e
+`TEMA_CHAVES="acento:@acento destaque:base fundo:base borda:surface1 texto:text bloco:surface0"`.
+Sem o arquivo, vale o tema do COSMIC.

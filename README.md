@@ -13,13 +13,11 @@ pinado, a mesma estrutura e o mesmo tema.
 - Na barra: um ponteiro que aponta o perfil (à direita **Desempenho**, ao centro
   **Equilibrado**, à esquerda **Economia**). Passar o mouse mostra o nome.
 - No popup:
-  - os três perfis; um clique troca na hora;
-  - **Placa**: o perfil que a placa-mãe seguiu (o `platform_profile`, no Acer Nitro o do
-    `acer-wmi`, que o `nitro-profiled` acompanha);
+  - os três perfis, o marcado na cor do acento; um clique troca na hora;
   - **Modo gráfico**: Integrada, Híbrida ou NVIDIA. Trocar pede confirmação, porque só vale
     depois de reiniciar; até o reinício o popup mostra «Reinicie para usar o modo …»;
-  - **NVIDIA**: nome, temperatura, consumo, uso, estado de energia e se o modo persistente
-    está ligado. Com a placa em suspensão o applet mostra «Dormindo» e não chama o
+  - **NVIDIA**: numa linha, o nome curto (sem «NVIDIA», «GeForce», «Laptop GPU») e, à direita,
+    temperatura, consumo, uso e estado de energia. Com a placa em suspensão o applet mostra «Dormindo» e não chama o
     `nvidia-smi`, que a acordaria.
 - Num computador sem troca de placa (`GetSwitchable` falso), o modo gráfico não aparece.
 
@@ -60,9 +58,11 @@ Depois, acrescente **Modo performance** em Configurações > Área de trabalho >
 
 ## Tema
 
-Igual ao do meowsystem-leitura: estilo de applet do libcosmic e desenhos `symbolic`
-(`data/icones/`), repintados com a cor do tema do COSMIC. O tema que o MeowSystem aplica vale
-aqui sem nenhuma linha a mais.
+Estilo de applet do libcosmic e desenhos `symbolic` (`data/icones/`), repintados com a cor do
+tema. Quando o theme pack traz `~/.config/meowsystem/extensoes/io.github.meowsystem.Performance/tema.conf`
+(ou `$MEOWSYSTEM_TEMA`), as cores dele valem por cima do COSMIC: `acento` no perfil marcado e no
+modo gráfico marcado, `destaque` no texto sobre o acento, `fundo`, `borda`, `texto` e `bloco` no
+popup. Linhas `chave = #rrggbb`; sem o arquivo, vale o tema do COSMIC.
 
 ## Licença
 
